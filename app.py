@@ -8,87 +8,103 @@ import plotly.graph_objects as go
 df = pd.read_csv('qualifying_results_F1.csv')
 
 def time_to_seconds(time_str):
-    if time_str == '0' or pd.isna(time_str) or time_str == "" or time_str == 0:
-        return None
+    if time_str in ['0', None, "", 0]: return None
     try:
         if ':' in str(time_str):
-            minutes, seconds = str(time_str).split(':')
-            return int(minutes) * 60 + float(seconds)
+            parts = str(time_str).split(':')
+            return int(parts[0]) * 60 + float(parts[1])
         return float(time_str)
-    except:
-        return None
+    except: return None
 
-# Limpieza de datos
 df['Q3_sec'] = df['Q3'].apply(time_to_seconds)
 df['Q2_sec'] = df['Q2'].apply(time_to_seconds)
 df['Q1_sec'] = df['Q1'].apply(time_to_seconds)
 
-# Diccionario de colores por escudería (puedes ampliarlo)
+# Mapa de colores para que se vea profesional
 team_colors = {
     'Ferrari': '#EF1A2D', 'Mercedes': '#00D2BE', 'Red Bull': '#0600EF',
     'McLaren': '#FF8700', 'Aston Martin': '#006F62', 'Alpine': '#0090FF',
-    'Williams': '#005AFF', 'AlphaTauri': '#2B4562', 'Haas': '#FFFFFF',
-    'Alfa Romeo': '#900000', 'RB F1 Team': '#6692FF', 'Sauber': '#52E252'
+    'Williams': '#005AFF', 'RB F1 Team': '#6692FF', 'Haas': '#FFFFFF'
 }
 
 app = dash.Dash(__name__)
 server = app.server
 
-app.layout = html.Div(style={'backgroundColor': '#111', 'color': 'white', 'padding': '20px', 'fontFamily': 'Arial'}, children=[
-    html.H1("🏎️ F1 ESTRATEGIA Y VELOCIDAD", style={'textAlign': 'center', 'color': '#FF1801', 'fontSize': '40px'}),
-    html.Hr(style={'borderColor': '#444'}),
+# Diseño con Estilo Dark Integrado
+app.layout = html.Div(style={
+    'backgroundColor': '#111', 'minHeight': '100vh', 'color': 'white', 
+    'padding': '20px', 'fontFamily': '"Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+}, children=[
+    
+    html.Div([
+        html.H1("🏁 F1 PERFORMANCE ANALYTICS", style={'textAlign': 'center', 'color': '#FF1801', 'letterSpacing': '2px'}),
+        html.P("Análisis interactivo de tiempos de clasificación", style={'textAlign': 'center', 'color': '#888'})
+    ], style={'marginBottom': '40px'}),
 
-    # Filtros
+    # Contenedor de Filtros
     html.Div([
         html.Div([
-            html.Label("Temporada:"),
+            html.Label("Temporada", style={'fontWeight': 'bold', 'marginBottom': '10px', 'display': 'block'}),
             dcc.Dropdown(
                 id='season-filter',
-                options=[{'label': i, 'value': i} for i in sorted(df['Season'].unique(), reverse=True)],
-                value=2024, style={'color': 'black'}
+                options=[{'label': str(i), 'value': i} for i in sorted(df['Season'].unique(), reverse=True)],
+                value=2024, # Valor por defecto
+                clearable=False,
+                style={'color': 'black'}
             ),
-        ], style={'width': '45%', 'display': 'inline-block', 'marginRight': '5%'}),
+        ], style={'width': '30%', 'display': 'inline-block', 'marginRight': '5%'}),
         
         html.Div([
-            html.Label("Circuito:"),
-            dcc.Dropdown(id='circuit-filter', style={'color': 'black'}),
-        ], style={'width': '45%', 'display': 'inline-block'}),
-    ], style={'marginBottom': '30px'}),
+            html.Label("Circuito / Gran Premio", style={'fontWeight': 'bold', 'marginBottom': '10px', 'display': 'block'}),
+            dcc.Dropdown(
+                id='circuit-filter',
+                value='monaco', # Valor por defecto para que no inicie vacío
+                clearable=False,
+                style={'color': 'black'}
+            ),
+        ], style={'width': '60%', 'display': 'inline-block'}),
+    ], style={'padding': '20px', 'backgroundColor': '#1e1e1e', 'borderRadius': '10px', 'marginBottom': '30px'}),
 
-    # KPIs / Resumen
+    # KPIs
     html.Div(id='kpi-container', style={'display': 'flex', 'justifyContent': 'space-around', 'marginBottom': '30px'}),
 
-    # Gráfico Principal
+    # Gráfico
     html.Div([
-        dcc.Graph(id='main-graph'),
-    ], style={'backgroundColor': '#222', 'padding': '15px', 'borderRadius': '10px'}),
+        dcc.Loading(
+            type="circle",
+            children=dcc.Graph(id='main-graph', style={'height': '500px'})
+        )
+    ], style={'backgroundColor': '#1e1e1e', 'padding': '20px', 'borderRadius': '10px'}),
 
-    # Tabla de Posiciones
+    # Tabla
     html.Div([
-        html.H3("Top 10 Clasificación Final", style={'marginTop': '30px'}),
+        html.H3("⏱️ Resultados Detallados", style={'marginTop': '40px', 'color': '#FF1801'}),
         dash_table.DataTable(
             id='results-table',
             columns=[
                 {"name": "Pos", "id": "Position"},
                 {"name": "Piloto", "id": "FamilyName"},
                 {"name": "Escudería", "id": "ConstructorName"},
+                {"name": "Q1 (s)", "id": "Q1_sec"},
+                {"name": "Q2 (s)", "id": "Q2_sec"},
                 {"name": "Q3 (s)", "id": "Q3_sec"}
             ],
-            style_header={'backgroundColor': '#333', 'color': 'white', 'fontWeight': 'bold'},
-            style_cell={'backgroundColor': '#222', 'color': 'white', 'textAlign': 'left'},
+            style_header={'backgroundColor': '#333', 'color': 'white', 'fontWeight': 'bold', 'border': '1px solid #444'},
+            style_cell={'backgroundColor': '#1e1e1e', 'color': '#ddd', 'textAlign': 'center', 'border': '1px solid #333', 'padding': '10px'},
+            style_data_conditional=[{'if': {'row_index': 'odd'}, 'backgroundColor': '#252525'}],
             page_size=10
         )
     ])
 ])
 
-# Callback para actualizar circuitos
+# Callbacks
 @app.callback(
     Output('circuit-filter', 'options'),
     Input('season-filter', 'value')
 )
-def set_circuit_options(selected_season):
-    dff = df[df['Season'] == selected_season]
-    return [{'label': i, 'value': i} for i in dff['CircuitID'].unique()]
+def update_circuits(season):
+    circuits = df[df['Season'] == season]['CircuitID'].unique()
+    return [{'label': i.replace('_', ' ').title(), 'value': i} for i in circuits]
 
 @app.callback(
     [Output('main-graph', 'figure'),
@@ -97,42 +113,42 @@ def set_circuit_options(selected_season):
     [Input('season-filter', 'value'),
      Input('circuit-filter', 'value')]
 )
-def update_dashboard(season, circuit):
-    if not circuit:
-        return go.Figure(), [], []
-
+def update_content(season, circuit):
     dff = df[(df['Season'] == season) & (df['CircuitID'] == circuit)].sort_values('Position')
     
-    # 1. Gráfico de barras con colores de equipo
+    if dff.empty:
+        return go.Figure(), [], []
+
+    # Gráfico de Tiempos
+    # Usamos Q3 si existe, si no Q1 (para los que no llegaron a Q3)
+    dff['Best_Time'] = dff['Q3_sec'].fillna(dff['Q2_sec']).fillna(dff['Q1_sec'])
+    
     fig = px.bar(
-        dff, x='FamilyName', y='Q3_sec',
+        dff, x='FamilyName', y='Best_Time',
         color='ConstructorName',
         color_discrete_map=team_colors,
-        title=f"Tiempos de Q3 - Gran Premio de {circuit}",
+        text_auto='.3f',
+        title=f"Mejor Tiempo en Clasificación: GP {circuit.title()} {season}",
         template='plotly_dark'
     )
     
-    # Ajustar el eje Y para que se noten las diferencias
-    min_time = dff['Q3_sec'][dff['Q3_sec'] > 0].min()
-    max_time = dff['Q3_sec'][dff['Q3_sec'] > 0].max()
-    if min_time and max_time:
-        fig.update_yaxes(range=[min_time * 0.98, max_time * 1.02])
+    # Zoom en el eje Y para ver diferencias
+    margin = dff['Best_Time'].min() * 0.02
+    fig.update_yaxes(range=[dff['Best_Time'].min() - margin, dff['Best_Time'].max() + margin], title="Segundos")
+    fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
 
-    # 2. Datos para la tabla
-    table_data = dff.to_dict('records')
-
-    # 3. KPIs (Pole Position)
-    pole_driver = dff.iloc[0]['FamilyName']
-    pole_team = dff.iloc[0]['ConstructorName']
-    
+    # KPIs
+    pole_row = dff.iloc[0]
     kpis = [
-        html.Div([html.H4("POLE POSITION"), html.P(f"{pole_driver} ({pole_team})")], 
-                 style={'border': '2px solid #FF1801', 'padding': '10px', 'borderRadius': '10px', 'width': '200px', 'textAlign': 'center'}),
-        html.Div([html.H4("ESTADO"), html.P("Finalizado")], 
-                 style={'border': '2px solid #444', 'padding': '10px', 'borderRadius': '10px', 'width': '200px', 'textAlign': 'center'})
+        html.Div([html.Small("POLE POSITION"), html.H3(pole_row['FamilyName'], style={'color': '#FF1801'})], 
+                 style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': '#1e1e1e', 'borderRadius': '10px', 'width': '25%'}),
+        html.Div([html.Small("ESCUDERÍA"), html.H3(pole_row['ConstructorName'])], 
+                 style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': '#1e1e1e', 'borderRadius': '10px', 'width': '25%'}),
+        html.Div([html.Small("TIEMPO POLE"), html.H3(f"{pole_row['Best_Time']:.3f}s")], 
+                 style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': '#1e1e1e', 'borderRadius': '10px', 'width': '25%'})
     ]
 
-    return fig, table_data, kpis
+    return fig, dff.to_dict('records'), kpis
 
 if __name__ == '__main__':
     app.run_server(debug=True)
