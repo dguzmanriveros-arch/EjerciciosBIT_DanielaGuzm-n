@@ -2,3 +2,7 @@ dash
 pandas
 plotly
 gunicorn
+streamlit
+pydeck
+geopy
+mapbox_vector_tile
